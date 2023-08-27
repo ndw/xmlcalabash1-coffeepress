@@ -64,7 +64,7 @@ jobs:
           prerelease: false
           fail_on_unmatched_files: true
           files: |
-            build/dist/xmlcalabash1-coffeepress-${{ env.CI_TAG }}.zip
+            build/distributions/xmlcalabash1-coffeepress-${{ env.CI_TAG }}.zip
 
       - name: Publish to Sonatype
         if: ${{ env.HAVE_GPGKEYURI == 'true' && env.CI_TAG != '' }}
