@@ -1,0 +1,31 @@
+<ixml>
+   <rule name='text'>
+      <alt>
+         <nonterminal name='sentence'/>
+      </alt>
+   </rule>
+   <rule name='sentence'>
+      <alt>
+         <repeat1>
+            <nonterminal name='word'/>
+            <sep>
+               <nonterminal name='WS'/>
+            </sep>
+         </repeat1>
+      </alt>
+   </rule>
+   <rule name='word'>
+      <alt>
+         <repeat1>
+            <inclusion>
+               <member code='L'/>
+            </inclusion>
+         </repeat1>
+      </alt>
+   </rule>
+   <rule mark='-' name='WS'>
+      <alt>
+         <literal tmark='-' string=' '/>
+      </alt>
+   </rule>
+</ixml>

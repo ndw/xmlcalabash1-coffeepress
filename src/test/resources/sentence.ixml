@@ -1,0 +1,4 @@
+text: sentence .
+sentence: word++WS .
+word: [L]+ .
+-WS: -" " .

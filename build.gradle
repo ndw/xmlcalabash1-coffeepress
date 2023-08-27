@@ -1,0 +1,218 @@
+buildscript {
+  repositories {
+    mavenCentral()
+  }
+
+  dependencies {
+    classpath group: 'net.sf.saxon', name: 'Saxon-HE', version: saxonVersion
+  }
+}
+
+plugins {
+  id "java"
+  id "maven-publish"
+  id "signing"
+}
+
+repositories {
+  mavenLocal()
+  mavenCentral()
+  maven { url "https://maven.restlet.talend.com" }
+}
+
+configurations.all {
+  resolutionStrategy {
+    force 'xml-apis:xml-apis:1.4.01'
+    force "net.sf.saxon:Saxon-HE:${saxonVersion}"
+  }
+}
+
+configurations {
+  copydep {
+    extendsFrom runtimeOnly
+  }
+  copydep.exclude module: 'xmlcalabash'
+  copydep.exclude module: 'nwalsh-annotations'
+}
+
+dependencies {
+  implementation (
+    [group: 'com.nwalsh', name: 'nwalsh-annotations', version: '1.0.1'],
+    [group: 'com.xmlcalabash', name: 'xmlcalabash', version: xmlCalabashVersion],
+    [group: 'org.nineml', name: 'coffeegrinder', version: '3.2.2'],
+    [group: 'org.nineml', name: 'coffeefilter', version: '3.2.2'],
+    [group: 'org.nineml', name: 'coffeesacks', version: '3.2.2'],
+    [group: 'net.sf.saxon', name: 'Saxon-HE', version: saxonVersion],
+    [group: 'org.slf4j', name: 'slf4j-api', version: '1.7.36']
+  )
+}
+
+testing {
+  suites {
+    test {
+      useJUnitJupiter('5.9.2')
+    }
+  }
+}
+
+// Variables
+project.ext.saxonRelease = saxonVersion.substring(0,2)
+project.ext.saxonBranch  = saxonVersion.substring(0,3).replaceAll("\\.", "")
+project.ext.releaseVersion = relVersion
+project.ext.distVersion = relVersion + snapshot
+relVersion = project.ext.distVersion // - gets turned into . in some contexts
+
+compileJava {
+  options.deprecation = true
+  options.compilerArgs += ['-Xlint:deprecation']
+  options.annotationProcessorPath = configurations.compileClasspath
+}
+
+task copyLib(type: Copy) {
+  FileCollection lib = configurations.copydep
+  String path = ""
+  lib.each {
+    File file -> path += " lib/" + file.name
+  }
+  project.ext.runtimeClasspath = path.trim()
+
+  from lib
+  into { "build/dist/lib" }
+}
+
+jar {
+  archiveBaseName = "xmlcalabash1-coffeepress-" + relVersion
+  manifest {
+    attributes 'Built-By': builtBy
+    attributes 'Implementation-Vendor': 'Norman Walsh'
+    attributes 'Implementation-Title': 'XML Calabash Invisible XML step'
+    attributes 'Implementation-Version': distVersion
+    attributes 'Bundle-SymbolicName': 'com.xmlcalabash.extensions.coffeepress'
+    attributes 'Bundle-RequiredExecutionEnvironment': 'J2SE-1.7'
+    attributes 'Export-Package': '*: etc'
+    attributes 'Import-Package': 'net.sf.saxon.*;version=' + project.ext.saxonRelease + ',\
+  javax.xml.*,\
+  org.apache.commons.httpclient.*,\
+  org.xml.sax.*,\
+  *;resolution:=optional'
+    attributes 'DynamicImport-Package': '*'
+    attributes 'Class-Path': project.ext.runtimeClasspath + " lib"
+  }
+}
+
+task copyNotices(type: Copy) {
+  from 'resources/notices'
+  into 'build/dist/docs/notices'
+}
+jar.dependsOn copyNotices
+
+task copyStuff(type: Copy) {
+  from 'README.md'
+  from 'LICENSE.md'
+  into 'build/dist'
+}
+
+task copyToDist(dependsOn: [copyLib,copyStuff]) {
+  // nop
+}
+jar.dependsOn copyToDist
+
+task javadocJar(type: Jar, dependsOn: javadoc) {
+    from tasks.javadoc.destinationDir
+    archiveClassifier = 'javadoc'
+}
+
+task sourcesJar(type: Jar) {
+    from sourceSets.main.allSource
+    archiveClassifier = 'sources'
+}
+
+task copyJar(dependsOn: jar, type: Copy) {
+  from "build/libs/xmlcalabash1-coffeepress-" + distVersion + ".jar"
+  into "build/dist"
+}
+
+task copyJavaDoc(dependsOn: javadoc, type: Copy) {
+  from "build/docs"
+  into "build/dist/docs"
+}
+
+task testStep(type: JavaExec) {
+  classpath = configurations.runtimeClasspath + sourceSets.main.output
+
+  mainClass = 'com.xmlcalabash.drivers.Main'
+  maxHeapSize = "1024m"
+  args('-D', '-a', 'src/test/resources/test-pipeline.xpl')
+}
+
+task makeDist(dependsOn: [ build, copyJar, copyLib ]) {
+  doLast {
+    println("Created distribution in build/dist")
+  }
+}
+
+task zipDist(dependsOn: makeDist, type: Zip) {
+  from('build/dist')
+  into 'xmlcalabash1-coffeepress-' + distVersion
+  archiveFileName = 'xmlcalabash1-coffeepress-' + distVersion + ".zip"
+}
+
+task dist(dependsOn: [testStep, zipDist]) {
+  // nop
+}
+
+
+signing {
+  sign publishing.publications
+}
+
+publishing {
+  publications {
+    mavenJava(MavenPublication) {
+      pom {
+        name = 'XML Calabash Invisible XML step'
+        packaging = 'jar'
+        description = 'XML Calabash extension step to perform Invisible XML parsing'
+        url = 'https://github.com/ndw/xmlcalabash1-coffeepress'
+
+        scm {
+          url = 'scm:git@github.com:ndw/xmlcalabash1-coffeepress.git'
+          connection = 'scm:git@github.com:ndw/xmlcalabash1-coffeepress.git'
+          developerConnection = 'scm:git@github.com:ndw/xmlcalabash1-coffeepress.git'
+        }
+
+        licenses {
+          license {
+            name = 'The Apache Software License, Version 2.0'
+            url = 'http://www.apache.org/licenses/LICENSE-2.0.txt'
+            distribution = 'repo'
+          }
+        }
+
+        developers {
+          developer {
+            id = 'ndw'
+            name = 'Norman Walsh'
+          }
+        }
+      }
+
+      groupId = "com.xmlcalabash"
+      artifactId = "xmlcalabash1-coffeepress"
+      version = relVersion
+      from components.java
+      artifact javadocJar
+      artifact sourcesJar
+    }
+  }
+
+  repositories {
+    maven {
+      url = "https://oss.sonatype.org/service/local/staging/deploy/maven2/"
+      credentials {
+        username = sonatypeUsername
+        password = sonatypePassword
+      }
+    }
+  }
+}
